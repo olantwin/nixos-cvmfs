@@ -157,6 +157,24 @@ in
         filesystem. Set to "0" to keep it mounted indefinitely.
       '';
     };
+
+    unmountOnSuspend = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        Unmount all CVMFS repositories before the system suspends or
+        hibernates.
+
+        Long-lived CVMFS connections do not survive a laptop sleep cleanly,
+        especially when the resume crosses a network change or a stratum-1
+        failover. Stale FUSE handles then cause any process touching
+        /cvmfs/* to block forever in fuse_send_open, which on a desktop
+        session prevents systemd from freezing user.slice and can push
+        GNOME into a screen-blank auto-suspend loop.
+
+        Set to false on always-on hosts where unmounting is needless churn.
+      '';
+    };
   };
 
   # ─── Config ───────────────────────────────────────────────────────────
@@ -285,5 +303,29 @@ in
         TimeoutIdleSec = cfg.automountIdleTimeout;
       };
     }) cfg.repositories;
+
+    # ── Pre-suspend unmount hook ──
+    #
+    # Ordered before sleep.target so cvmfs_config umount runs as part of
+    # the transition into any sleep mode (suspend / hibernate / hybrid /
+    # suspend-then-hibernate). The .automount units stay armed and
+    # re-trigger a fresh mount on first /cvmfs/* access after resume, so
+    # there is no symmetric "remount on resume" hook to install.
+    #
+    # If cvmfs_config umount itself wedges (a process is holding a mount
+    # open in D-state), TimeoutStartSec aborts it and the suspend
+    # transition fails — preferable to entering sleep with stale state.
+    systemd.services.cvmfs-umount-on-suspend = lib.mkIf cfg.unmountOnSuspend {
+      description = "Unmount CVMFS repositories before sleep";
+      before = [ "sleep.target" ];
+      wantedBy = [ "sleep.target" ];
+      unitConfig.StopWhenUnneeded = true;
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        TimeoutStartSec = "30";
+        ExecStart = "${cfg.package}/bin/cvmfs_config umount";
+      };
+    };
   };
 }

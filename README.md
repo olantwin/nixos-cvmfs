@@ -59,6 +59,7 @@ After `nixos-rebuild switch`, accessing `/cvmfs/sft.cern.ch/` triggers the autom
 | `extraConfig` | attrs of str | `{}` | Additional key-value pairs for `default.local` |
 | `extraRepoConfig` | attrs of str | `{}` | Per-repo config (key = FQRN, value = config content) |
 | `automountIdleTimeout` | str | `"600"` | Seconds of inactivity before unmount (`"0"` = never) |
+| `unmountOnSuspend` | bool | `true` | Unmount all repositories before suspend/hibernate so stale FUSE handles don't survive a sleep |
 
 ## What the module sets up
 
