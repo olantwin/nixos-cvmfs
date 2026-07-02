@@ -319,6 +319,13 @@ in
       description = "Unmount CVMFS repositories before sleep";
       before = [ "sleep.target" ];
       wantedBy = [ "sleep.target" ];
+      # cvmfs_config umount shells out to bare-name tools that aren't in the
+      # default systemd service PATH: `mount`/`umount`/`fuser` (util-linux)
+      # and `awk` (gawk). Without them the hook fails and suspend stalls.
+      path = [
+        pkgs.util-linux
+        pkgs.gawk
+      ];
       unitConfig.StopWhenUnneeded = true;
       serviceConfig = {
         Type = "oneshot";
