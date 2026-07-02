@@ -269,6 +269,15 @@ stdenv.mkDerivation rec {
     if [ -f "$out/bin/mount.cvmfs" ] && [ ! -f "$out/bin/mount.fuse.cvmfs2" ]; then
       ln -s mount.cvmfs "$out/bin/mount.fuse.cvmfs2"
     fi
+
+    # cvmfs_config gates *every* subcommand on a hardcoded `-x /usr/bin/attr`
+    # FHS check and exit 1s ("attr utility required") when it's absent. NixOS
+    # has no /usr/bin, so the script dies before doing anything — which breaks
+    # the pre-suspend `cvmfs_config umount` hook and leaves stale FUSE mounts
+    # that block suspend. An `-x` on an absolute path can't be fixed via PATH,
+    # so point it at the real attr binary (already in buildInputs).
+    substituteInPlace $out/bin/cvmfs_config \
+      --replace-fail '/usr/bin/attr' '${attr}/bin/attr'
   '';
 
   # cvmfs2 dlopen()s libcvmfs_fuse3.so at runtime, which in turn needs
